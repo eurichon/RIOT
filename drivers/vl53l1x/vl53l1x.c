@@ -130,8 +130,7 @@ int vl53l1x_init(vl53l1x_t *dev, const vl53l1x_params_t *params) {
     VL53L1X_SetDistanceMode(dev->params.addr, VL53L1X_MODE_LONG);
     VL53L1X_SetTimingBudgetInMs(dev->params.addr, VL53L1X_TB_100_MS);
     VL53L1X_SetInterMeasurementInMs(dev->params.addr, VL53L1X_TB_100_MS);
-    VL53L1X_StartRanging(dev->params.addr);
-
+    
     return 0;
 }
 
