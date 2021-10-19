@@ -42,6 +42,7 @@ typedef enum
     _CAN,       /**< pin is used as CAN signal */
     _DAC,       /**< pin is used as DAC output */
     _EMAC,      /**< pin is used as EMAC signal */
+    _TOUCH,     /**< pin is used as TOUCH input */
 #endif /* MCU_ESP32 */
     _I2C,       /**< pin is used as I2C signal */
     _PWM,       /**< pin is used as PWM output */

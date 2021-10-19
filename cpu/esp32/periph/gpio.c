@@ -150,7 +150,7 @@ static const int8_t _gpio_to_rtc[GPIO_PIN_NUMOF] = {
      0,  /* gpio36 */
      1,  /* gpio37 */
      2,  /* gpio38 */
-     9   /* gpio39 */
+     3   /* gpio39 */
 };
 
 /**
@@ -246,7 +246,7 @@ gpio_pin_usage_t _gpio_pin_usage [GPIO_PIN_NUMOF] = {
 /* String representation of usage types */
 const char* _gpio_pin_usage_str[] =
 {
-    "GPIO", "ADC", "CAN", "DAC", "EMAC", "I2C", "PWM", "SPI", "SPI Flash", "UART", "N/A"
+    "GPIO", "ADC", "CAN", "DAC", "EMAC", "TOUCH", "I2C", "PWM", "SPI", "SPI Flash", "UART", "N/A"
 };
 
 #define FUN_GPIO   2 /* the function number for all GPIOs */
