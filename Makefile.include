@@ -307,7 +307,7 @@ ifdef LOG_LEVEL
 endif
 
 # Fail on warnings. Can be overridden by `make WERROR=0`.
-WERROR ?= 1
+WERROR ?= 0
 ifeq ($(WERROR),1)
   CFLAGS += -Werror
 endif

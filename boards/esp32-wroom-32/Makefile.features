@@ -9,5 +9,7 @@ FEATURES_PROVIDED += periph_dac
 FEATURES_PROVIDED += periph_i2c
 FEATURES_PROVIDED += periph_pwm
 FEATURES_PROVIDED += periph_spi
+# provide touch feature
+FEATURES_PROVIDED += periph_touch_pad
 
 FEATURES_PROVIDED += arduino
