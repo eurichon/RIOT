@@ -74,6 +74,8 @@ static void _rtc_poweron(void)
     /* set interrupt handler and enable the CPU interrupt */
     xt_set_interrupt_handler(CPU_INUM_RTC, _rtc_isr, NULL);
     xt_ints_on(BIT(CPU_INUM_RTC));
+
+    // esp_intr_alloc(ETS_RTC_CORE_INTR_SOURCE, 0, _rtc_isr, NULL, NULL);
 }
 
 static void _rtc_poweroff(void)

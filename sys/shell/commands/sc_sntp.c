@@ -48,7 +48,7 @@ int _ntpdate(int argc, char **argv)
 
     char *iface = ipv6_addr_split_iface(argv[1]);
     kernel_pid_t src_iface = iface ? atoi(iface) : KERNEL_PID_UNDEF;
-
+    
     if (ipv6_addr_from_str(addr, argv[1]) == NULL) {
         puts("error: malformed address");
         return 1;

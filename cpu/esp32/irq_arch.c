@@ -48,7 +48,8 @@ static const struct _irq_alloc_table_t _irq_alloc_table[] = {
     { ETS_I2C_EXT0_INTR_SOURCE, CPU_INUM_I2C },
     { ETS_I2C_EXT1_INTR_SOURCE, CPU_INUM_I2C },
     { ETS_ETH_MAC_INTR_SOURCE, CPU_INUM_ETH },
-    { ETS_CAN_INTR_SOURCE, CPU_INUM_CAN }
+    { ETS_CAN_INTR_SOURCE, CPU_INUM_CAN },
+    { ETS_RTC_CORE_INTR_SOURCE, CPU_INUM_RTC} // mine
 };
 
 typedef void (*intr_handler_t)(void *arg);
@@ -75,7 +76,7 @@ esp_err_t esp_intr_alloc(int source, int flags, intr_handler_t handler,
             break;
         }
     }
-
+    
     if (i == IRQ_ALLOC_TABLE_SIZE) {
         return ESP_ERR_NOT_FOUND;
     }

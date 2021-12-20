@@ -5,7 +5,6 @@
 extern "C" {
 #endif
 
-
 //Some register bits of touch sensor 8 and 9 are mismatched, we need to swap the bits.
 #define TOUCH_LL_BIT_SWAP(data, n, m)       (((data >> n) &  0x1)  == ((data >> m) & 0x1) ? (data) : ((data) ^ ((0x1 <<n) | (0x1 << m))))
 #define TOUCH_LL_BITS_SWAP(v)               TOUCH_LL_BIT_SWAP(v, TOUCH_PAD_NUM8, TOUCH_PAD_NUM9)
@@ -213,7 +212,6 @@ extern const rtc_io_desc_t rtc_io_desc[SOC_RTCIO_PIN_COUNT];
 
 
 #define RTCIO_LL_PIN_FUNC                   (0U)
-#define RTC_GPIO_MODE_DISABLED              (3U)
 
 
 

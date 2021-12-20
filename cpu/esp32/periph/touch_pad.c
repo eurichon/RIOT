@@ -1,4 +1,5 @@
 #include <stdio.h> // for debugging
+#include <stdlib.h>
 
 #include "board.h"
 #include "periph/touch_pad.h"
@@ -7,9 +8,27 @@
 #include "soc/rtc_cntl_struct.h"
 #include "soc/rtc_io_struct.h"
 #include "soc/rtc_io_reg.h"
+#include "soc/dport_reg.h"
+
+#include "esp_attr.h"
+#include "esp/common_macros.h"
+#include "esp_common.h"
+
+#include "rom/ets_sys.h"
+#include "xtensa/xtensa_api.h"
+
+
+#include "irq_arch.h"
+#include "soc/rtc_periph.h"
+#include "esp_intr_alloc.h"
+// #include "esp_sleep.h"
+
 
 #include "gpio_arch.h"
 #include "periph/gpio.h"
+
+#define RTC_GPIO_MODE_DISABLED              (3U)
+
 
 // /* Store IO number corresponding to the Touch Sensor channel number. */
 const int touch_sensor_channel_io_map[SOC_TOUCH_SENSOR_NUM] = {
@@ -114,7 +133,7 @@ void _touch_pad_sw_start(void);
 
 
 void touch_pad_init(void) {
-    puts("Hello from touch init!");
+    // puts("Hello from touch init!");
 
     // stops the FSM timer
     RTCCNTL.state0.touch_slp_timer_en = 0;
@@ -142,8 +161,8 @@ void touch_pad_init(void) {
     SENS.sar_touch_ctrl2.touch_meas_en_clr = 1;
 
     //Set touch sensor measurement time
-    SENS.sar_touch_ctrl1.touch_meas_delay = TOUCH_PAD_MEASURE_CYCLE_DEFAULT;
-    SENS.sar_touch_ctrl1.touch_xpd_wait = SOC_TOUCH_PAD_MEASURE_WAIT_MAX;
+    SENS.sar_touch_ctrl1.touch_meas_delay = TOUCH_PAD_MEASURE_CYCLE_DEFAULT;        // here maybe HAL_FORCE_MODIFY_U32_REG_FIELD
+    SENS.sar_touch_ctrl1.touch_xpd_wait = SOC_TOUCH_PAD_MEASURE_WAIT_MAX;           // here maybe HAL_FORCE_MODIFY_U32_REG_FIELD
 
     // set touch sensor FSM mode
     SENS.sar_touch_ctrl2.touch_start_fsm_en = 1;
@@ -167,27 +186,55 @@ void touch_pad_deinit(void) {
 }
 
 
-void touch_pad_set_voltage(const touch_hal_volt_t *volt) {
+void touch_pad_set_voltage( touch_high_volt_t refh, touch_low_volt_t refl, touch_volt_atten_t atten) {
+
     // set high voltage
-    RTCIO.touch_cfg.drefh = volt->refh;
+    RTCIO.touch_cfg.drefh = refh;
 
     // set low voltage
-    RTCIO.touch_cfg.drefl = volt->refl;
+    RTCIO.touch_cfg.drefl = refl;
     
     // set attenuation
-    RTCIO.touch_cfg.drange = volt->atten;
+    RTCIO.touch_cfg.drange = atten;
 }
 
 /* 
  * sets threshold of the pads to the given value         
  */
-void touch_sensor_set_threashold(touch_pad_t touch_num, uint16_t threshold) {  
+void touch_sensor_set_threshold(touch_pad_t touch_num, uint16_t threshold) {  
     touch_pad_t tp_wrap = touch_corrert_nums(touch_num); 
 
+    // printf("Tp wrap is: %i\n", tp_wrap);
+
     if (tp_wrap & 0x1) {                                            
-        SENS.touch_thresh[tp_wrap / 2].l_thresh = threshold;
+        uint32_t temp_val = SENS.touch_thresh[tp_wrap / 2].val;
+        sens_dev_t temp_reg;
+        temp_reg.touch_thresh[tp_wrap / 2].val = temp_val;
+        temp_reg.touch_thresh[tp_wrap / 2].l_thresh = threshold;
+        SENS.touch_thresh[tp_wrap / 2].val = temp_reg.touch_thresh[tp_wrap / 2].val;
+
+        // SENS.touch_thresh[tp_wrap / 2].l_thresh = threshold;
     } else {
-        SENS.touch_thresh[tp_wrap / 2].h_thresh = threshold;
+        uint32_t temp_val = SENS.touch_thresh[tp_wrap / 2].val;
+        sens_dev_t temp_reg;
+        temp_reg.touch_thresh[tp_wrap / 2].val = temp_val;
+        temp_reg.touch_thresh[tp_wrap / 2].h_thresh = threshold;
+        SENS.touch_thresh[tp_wrap / 2].val = temp_reg.touch_thresh[tp_wrap / 2].val;
+
+        // SENS.touch_thresh[tp_wrap / 2].h_thresh = threshold;
+    }
+}
+
+
+void touch_pad_get_threshold(touch_pad_t touch_num, uint16_t *threshold) {  
+    touch_pad_t tp_wrap = touch_corrert_nums(touch_num); 
+
+    // printf("Tp wrap is: %i\n", tp_wrap);
+
+    if (tp_wrap & 0x1) {    
+        *threshold = SENS.touch_thresh[tp_wrap / 2].l_thresh;                                      
+    } else {
+        *threshold = SENS.touch_thresh[tp_wrap / 2].h_thresh;     
     }
 }
 
@@ -195,7 +242,7 @@ void touch_sensor_set_threashold(touch_pad_t touch_num, uint16_t threshold) {
  * touch hal config
  */
 void touch_sensor_config(touch_pad_t touch_num) {
-    touch_sensor_set_threashold(touch_num, TOUCH_PAD_THRESHOLD_MAX);
+    touch_sensor_set_threshold(touch_num, TOUCH_PAD_THRESHOLD_MAX);
     
     // set slope
     RTCIO.touch_pad[touch_num].dac = TOUCH_PAD_SLOPE_DEFAULT;       
@@ -211,6 +258,8 @@ int touch_pad_clear_group_mask(uint16_t set1_mask, uint16_t set2_mask, uint16_t 
 
     SENS.sar_touch_enable.touch_pad_outen1 &= TOUCH_LL_BITS_SWAP(~set1_mask);
     SENS.sar_touch_enable.touch_pad_outen2 &= TOUCH_LL_BITS_SWAP(~set2_mask);
+
+    return 0;
 }
 
 int touch_pad_set_group_mask(uint16_t set1_mask, uint16_t set2_mask, uint16_t en_mask) {
@@ -218,32 +267,36 @@ int touch_pad_set_group_mask(uint16_t set1_mask, uint16_t set2_mask, uint16_t en
 
     SENS.sar_touch_enable.touch_pad_outen1 |= TOUCH_LL_BITS_SWAP(set1_mask);
     SENS.sar_touch_enable.touch_pad_outen2 |= TOUCH_LL_BITS_SWAP(set2_mask);
+
+    return 0;
 }
 
 
 void touch_pad_config(touch_pad_t touch_num, uint16_t threshold) {
     touch_fsm_mode_t mode;
 
-    touch_pad_io_init(touch_num);
+    if(touch_pad_io_init(touch_num) != 0) {
+        puts("Error in configuring io");
+    }
 
     touch_sensor_config(touch_num);    
 
-    touch_sensor_set_threashold(touch_num, threshold);
+    touch_sensor_set_threshold(touch_num, threshold);
 
     touch_pad_get_fsm_mode(&mode);
 
     if (mode == TOUCH_FSM_MODE_SW) {
         touch_pad_clear_group_mask((1 << touch_num), (1 << touch_num), (1 << touch_num));
-        s_touch_pad_init_bit |= (1 << touch_num);        
+    } else if(mode == TOUCH_FSM_MODE_TIMER) {
+
+        // puts("Trigger timer mode");
+
+        touch_pad_set_group_mask((1 << touch_num), (1 << touch_num), (1 << touch_num));
     }
 }
 
 void touch_pad_get_fsm_mode(touch_fsm_mode_t *mode) {
     *mode = (touch_fsm_mode_t)SENS.sar_touch_ctrl2.touch_start_force;
-}
-
-void touch_pad_read_raw_data(touch_pad_t touch_num, uint16_t *touch_value) {
-    // *touch_value = s_touch_pad_filter->raw_val[touch_num];
 }
 
 int touch_pad_io_init(touch_pad_t touch_num) {
@@ -287,7 +340,10 @@ void _touch_pad_sw_start(void) {
 }
 
 
-int touch_pad_read(touch_pad_t touch_num, uint16_t *touch_value, touch_fsm_mode_t mode) {
+int touch_pad_read(touch_pad_t touch_num, uint16_t *touch_value) {
+    touch_fsm_mode_t mode;
+    touch_pad_get_fsm_mode(&mode);
+
     if (mode == TOUCH_FSM_MODE_SW) {
         touch_pad_set_group_mask((1 << touch_num), (1 << touch_num), (1 << touch_num));
 
@@ -299,8 +355,99 @@ int touch_pad_read(touch_pad_t touch_num, uint16_t *touch_value, touch_fsm_mode_
         touch_pad_clear_group_mask((1 << touch_num), (1 << touch_num), (1 << touch_num));
 
         return 0;
+    } else if (mode == TOUCH_FSM_MODE_TIMER) {
+        while (!touch_ll_meas_is_done()) {};
+        *touch_value = touch_ll_read_raw_data(touch_num);
+
+        return 0;
     }
 
     return -1;
 }
 
+
+// for interrupt trigger source
+
+void touch_pad_start_fsm(void) {
+    RTCCNTL.state0.touch_slp_timer_en = 1;
+}
+
+void touch_pad_stop_fsm(void) {
+    RTCCNTL.state0.touch_slp_timer_en = 0;
+}
+
+void touch_pad_set_fsm_mode(touch_fsm_mode_t mode) {
+    SENS.sar_touch_ctrl2.touch_start_fsm_en = 1;
+    SENS.sar_touch_ctrl2.touch_start_en = 0;
+    SENS.sar_touch_ctrl2.touch_start_force = mode;
+
+    if (mode == TOUCH_FSM_MODE_TIMER) {
+        touch_pad_start_fsm();
+    } else {
+        touch_pad_stop_fsm();
+    }
+}
+
+// IRAM_ATTR ?
+int touch_pad_get_status(void) {
+    return TOUCH_LL_BITS_SWAP(SENS.sar_touch_ctrl2.touch_meas_en);
+}
+
+void touch_pad_clear_status(void) {
+    SENS.sar_touch_ctrl2.touch_meas_en_clr = 1;
+}
+
+void touch_pad_intr_enable(void) {
+    RTCCNTL.int_ena.rtc_touch = 1;
+}
+
+void touch_pad_intr_disable(void) {
+    RTCCNTL.int_ena.rtc_touch = 0;
+}
+
+void touch_pad_set_thresh(touch_pad_t touch_num, uint16_t threshold) {
+    touch_sensor_set_threshold(touch_num, threshold);
+}
+
+static int touch_pad_counter = 0;
+
+static void IRAM yolo(void *arg) {
+    RTCCNTL.int_ena.rtc_touch = 0;
+    RTCCNTL.int_clr.rtc_touch = 1;
+
+    uint32_t pad_intr = touch_pad_get_status();
+    for (int i = 0; i < TOUCH_PAD_MAX; i++) {
+        if ((pad_intr >> i) & 0x01) {
+            printf("Touched: %i\n", i);
+
+            touch_pad_counter++;
+            printf("Hello %i\n", touch_pad_counter);
+        }
+    }
+
+    SENS.sar_touch_ctrl2.touch_meas_en_clr = 1; 
+    RTCCNTL.int_ena.rtc_touch = 1;
+}
+
+
+int touch_pad_isr_register(intr_handler_t cb, void *arg) {    
+    REG_WRITE(RTC_CNTL_INT_ENA_REG, 0);
+    REG_WRITE(RTC_CNTL_INT_CLR_REG, UINT32_MAX);
+
+    // int error = esp_intr_alloc(ETS_RTC_CORE_INTR_SOURCE, 0, yolo, NULL, NULL);
+
+    /* route all interrupt sources to the same RTT level type interrupt */
+    intr_matrix_set(PRO_CPU_NUM, ETS_RTC_CORE_INTR_SOURCE, CPU_INUM_RTC);
+
+    /* set interrupt handler and enable the CPU interrupt */
+    xt_set_interrupt_handler(CPU_INUM_RTC, &yolo, NULL);
+    xt_ints_on(BIT(CPU_INUM_RTC));
+
+    // printf("Error is: %i\n", error);
+    
+    return 0;
+}
+
+int return_touch_counter(void) {
+    return touch_pad_counter;
+}
