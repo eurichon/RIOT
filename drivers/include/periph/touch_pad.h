@@ -57,4 +57,8 @@ void touch_pad_intr_disable(void);
 
 int touch_pad_isr_register(touch_pad_intr_handler_t cb, void *arg);
 
+
+void touch_pad_set_trigger_source(touch_trigger_src_t src);
+
+
 #endif // PERIPH_TOUCH_PAD_H

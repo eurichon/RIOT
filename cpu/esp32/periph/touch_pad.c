@@ -102,7 +102,6 @@ static inline touch_pad_t touch_corrert_nums(touch_pad_t touch_num)
     return touch_num;
 }
 
-
 /**
  * Get touch sensor measure status. No block.
  *
@@ -492,4 +491,9 @@ int touch_pad_isr_register(touch_pad_intr_handler_t cb, void *arg) {
     // printf("Error is: %i\n", error);
     
     return 0;
+}
+
+void touch_pad_set_trigger_source(touch_trigger_src_t src)
+{
+    SENS.sar_touch_ctrl1.touch_out_1en = src;
 }

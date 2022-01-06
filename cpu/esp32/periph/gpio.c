@@ -600,6 +600,7 @@ void gpio_pm_sleep_enter(unsigned mode)
         for (unsigned i = 0; i < ARRAY_SIZE(wup_pins); i++) {
             wup_pin_mask |= 1ULL << wup_pins[i];
         }
+        esp_sleep_enable_touchpad_wakeup();
         esp_sleep_enable_ext1_wakeup(wup_pin_mask, ESP_PM_WUP_LEVEL);
 #endif /* ESP_PM_WUP_PINS */
     }
