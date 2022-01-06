@@ -70,8 +70,7 @@ const rtc_io_desc_t rtc_io_desc[SOC_RTCIO_PIN_COUNT] = {
 };
 
 
-static uint16_t s_touch_pad_init_bit = 0x0000;
-
+// static uint16_t s_touch_pad_init_bit = 0x0000;
 
 /* 
  * checks if a gpio pin is given and if it is unused
@@ -388,9 +387,35 @@ void touch_pad_set_fsm_mode(touch_fsm_mode_t mode) {
     }
 }
 
-// IRAM_ATTR ?
-int touch_pad_get_status(void) {
+uint16_t touch_pad_get_status(void) {
     return TOUCH_LL_BITS_SWAP(SENS.sar_touch_ctrl2.touch_meas_en);
+}
+
+uint8_t touch_pad_status_to_pin(uint16_t status) {
+    switch (status) {
+        case 1:
+            return 0;
+        case 2:
+            return 1;
+        case 4:
+            return 2;
+        case 8:
+            return 3;
+        case 16:
+            return 4;
+        case 32:
+            return 5;
+        case 64:
+            return 6;
+        case 128:
+            return 7;
+        case 256:
+            return 8;
+        case 512:
+            return 9;
+        default:
+            return 255;
+    }
 }
 
 void touch_pad_clear_status(void) {
@@ -409,28 +434,41 @@ void touch_pad_set_thresh(touch_pad_t touch_num, uint16_t threshold) {
     touch_sensor_set_threshold(touch_num, threshold);
 }
 
-static int touch_pad_counter = 0;
+void touch_pad_haha(void) {
+    RTCCNTL.int_ena.rtc_touch = 0;
+    RTCCNTL.int_clr.rtc_touch = 1;
+}
 
-static void IRAM yolo(void *arg) {
+typedef struct {
+    touch_pad_intr_handler_t cb;
+    touch_pad_intr_arg_t arg;
+} touch_pad_cb_wrapper_arg_t;
+
+touch_pad_cb_wrapper_arg_t wrappers[SOC_TOUCH_SENSOR_NUM];
+static int touch_pad_wrapper_counter = -1;
+
+static void IRAM touch_pad_cb_wrapper(void *arg) {
     RTCCNTL.int_ena.rtc_touch = 0;
     RTCCNTL.int_clr.rtc_touch = 1;
 
-    uint32_t pad_intr = touch_pad_get_status();
-    for (int i = 0; i < TOUCH_PAD_MAX; i++) {
-        if ((pad_intr >> i) & 0x01) {
-            printf("Touched: %i\n", i);
+    touch_pad_cb_wrapper_arg_t *wrapper = (touch_pad_cb_wrapper_arg_t *)arg;
 
-            touch_pad_counter++;
-            printf("Hello %i\n", touch_pad_counter);
-        }
+    uint16_t status = touch_pad_get_status();
+    uint8_t touch_pin = touch_pad_status_to_pin(status);
+
+    if (touch_pin != 255) {
+        wrapper->cb(touch_pin ,wrapper->arg);
     }
 
     SENS.sar_touch_ctrl2.touch_meas_en_clr = 1; 
     RTCCNTL.int_ena.rtc_touch = 1;
 }
 
-
-int touch_pad_isr_register(intr_handler_t cb, void *arg) {    
+int touch_pad_isr_register(touch_pad_intr_handler_t cb, void *arg) {    
+    if (touch_pad_wrapper_counter >= SOC_TOUCH_SENSOR_NUM) {
+        return -1;
+    }
+    
     REG_WRITE(RTC_CNTL_INT_ENA_REG, 0);
     REG_WRITE(RTC_CNTL_INT_CLR_REG, UINT32_MAX);
 
@@ -440,14 +478,18 @@ int touch_pad_isr_register(intr_handler_t cb, void *arg) {
     intr_matrix_set(PRO_CPU_NUM, ETS_RTC_CORE_INTR_SOURCE, CPU_INUM_RTC);
 
     /* set interrupt handler and enable the CPU interrupt */
-    xt_set_interrupt_handler(CPU_INUM_RTC, &yolo, NULL);
-    xt_ints_on(BIT(CPU_INUM_RTC));
+    touch_pad_wrapper_counter++;
+    wrappers[touch_pad_wrapper_counter].cb = cb;
+    wrappers[touch_pad_wrapper_counter].arg = arg;
 
+    xt_set_interrupt_handler(CPU_INUM_RTC, 
+                             &touch_pad_cb_wrapper, 
+                             (void *)&wrappers[touch_pad_wrapper_counter]);
+
+    // xt_set_interrupt_handler(CPU_INUM_RTC, &yolo, NULL);
+
+    xt_ints_on(BIT(CPU_INUM_RTC));
     // printf("Error is: %i\n", error);
     
     return 0;
-}
-
-int return_touch_counter(void) {
-    return touch_pad_counter;
 }

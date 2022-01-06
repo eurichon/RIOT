@@ -30,13 +30,13 @@ extern "C" {
  * @{
  */
 #ifndef APA102_PARAM_LED_NUMOF
-#define APA102_PARAM_LED_NUMOF      (64)    /* many have 64 per meter... */
+#define APA102_PARAM_LED_NUMOF      (5)    /* many have 64 per meter... */
 #endif
 #ifndef APA102_PARAM_DATA_PIN
-#define APA102_PARAM_DATA_PIN       (GPIO_PIN(0, 0))
+#define APA102_PARAM_DATA_PIN       (GPIO_PIN(0, 13))
 #endif
 #ifndef APA102_PARAM_CLK_PIN
-#define APA102_PARAM_CLK_PIN        (GPIO_PIN(0, 1))
+#define APA102_PARAM_CLK_PIN        (GPIO_PIN(0, 14))
 #endif
 
 #ifndef APA102_PARAMS

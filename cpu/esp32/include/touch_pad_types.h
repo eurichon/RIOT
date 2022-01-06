@@ -181,14 +181,6 @@ typedef enum {
 #define RTCIO_CHANNEL_17_GPIO_NUM   27
 
 
-
-
-
-
-
-
-
-
 #define SOC_RTCIO_PIN_COUNT 18
 
 typedef struct {
